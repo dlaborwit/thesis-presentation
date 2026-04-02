@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brownian Motion Race</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      background: #fff;
+      font-family: 'Georgia', serif;
+      overflow-x: hidden;
+    }
+
+    /* ── HERO ── */
+    #hero {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+    }
+
+    .hero-title {
+      font-size: clamp(48px, 10vw, 120px);
+      font-weight: 400;
+      letter-spacing: -0.04em;
+      color: #111;
+      line-height: 0.9;
+      text-align: center;
+      font-style: italic;
+      user-select: none;
+    }
+
+    .hero-sub {
+      margin-top: 32px;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #aaa;
+      font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #ccc;
+      font-family: 'Helvetica Neue', sans-serif;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    /* ── RACE SECTION ── */
+    #race-section {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    #race-section.visible { opacity: 1; }
+
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #aaa;
+      font-family: 'Helvetica Neue', sans-serif;
+      margin-bottom: 24px;
+      transition: opacity 0.4s ease;
+    }
+
+    #raceWrap {
+      position: relative;
+      width: min(700px, 90vw);
+      height: min(380px, 55vw);
+    }
+
+    #raceCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .axis-label {
+      position: absolute;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #ccc;
+      font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    .axis-label.x-label {
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .axis-label.y-label {
+      top: 50%;
+      left: -52px;
+      transform: translateY(-50%) rotate(-90deg);
+    }
+
+    .winner-badge {
+      position: absolute;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-family: 'Helvetica Neue', sans-serif;
+      padding: 4px 12px;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .winner-badge.show { opacity: 1; }
+
+    .race-legend {
+      display: flex;
+      gap: 24px;
+      margin-top: 28px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #aaa;
+      font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .controls-row {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-family: 'Helvetica Neue', sans-serif;
+      border: 1px solid #ddd;
+      background: transparent;
+      color: #999;
+      padding: 5px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, opacity 0.3s;
+    }
+
+    .ctrl-btn:hover { border-color: #111; color: #111; }
+    .ctrl-btn:disabled { opacity: 0.3; cursor: default; }
+
+    .seed-input {
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      font-family: 'Helvetica Neue', sans-serif;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      padding: 5px 14px;
+      width: 90px;
+      outline: none;
+      color: #111;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO -->
+  <section id="hero">
+    <h1 class="hero-title">brownian race</h1>
+    <p class="hero-sub">Two parties &nbsp;·&nbsp; Random walks &nbsp;·&nbsp; One winner</p>
+    <div class="scroll-hint">scroll to begin</div>
+  </section>
+
+  <!-- RACE -->
+  <section id="race-section">
+    <p class="section-label" id="sectionLabel">Race 1 — Pure Brownian Motion</p>
+    <div id="raceWrap">
+      <canvas id="raceCanvas"></canvas>
+      <span class="axis-label x-label">Time</span>
+      <span class="axis-label y-label">Ability</span>
+      <div class="winner-badge" id="winnerBadge"></div>
+    </div>
+    <div class="race-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Party 1</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f43f5e"></div>Party 2</div>
+    </div>
+    <div class="controls-row">
+      <input type="text" class="seed-input" id="seedInput" placeholder="seed…" value="42">
+      <button class="ctrl-btn" id="replayBtn">Replay</button>
+      <button class="ctrl-btn" id="newSeedBtn">New Seed</button>
+      <button class="ctrl-btn" id="nextRaceBtn" disabled>Next Race →</button>
+    </div>
+  </section>
+
+<script>
+/* ================================================================
+   BROWNIAN RACE — with physics transition to jump-diffusion race
+   ================================================================ */
+
+// ── SEEDED RNG (mulberry32) ──
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function hashSeed(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+// ── Box-Muller for normal random ──
+function normalRandom(rng) {
+  const u1 = rng(), u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2);
+}
+
+// ── COLORS ──
+const COLOR_A = '#6366f1';
+const COLOR_B = '#f43f5e';
+
+function hexRgb(hex) {
+  return {
+    r: parseInt(hex.slice(1,3), 16),
+    g: parseInt(hex.slice(3,5), 16),
+    b: parseInt(hex.slice(5,7), 16)
+  };
+}
+
+// ── DRAW PARTICLE ──
+function drawParticle(ctx, cx, cy, color) {
+  if (!isFinite(cx) || !isFinite(cy)) return;
+  const glR = 18;
+  const { r, g, b } = hexRgb(color);
+  const gl = ctx.createRadialGradient(cx, cy, 0, cx, cy, glR);
+  gl.addColorStop(0, `rgba(${r},${g},${b},0.22)`);
+  gl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.beginPath(); ctx.arc(cx, cy, glR, 0, Math.PI*2); ctx.fillStyle = gl; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx-1.5, cy-1.5, 1.8, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+}
+
+// ── CANVAS ──
+const canvas = document.getElementById('raceCanvas');
+const ctx = canvas.getContext('2d');
+const wBadge = document.getElementById('winnerBadge');
+const sectionLabel = document.getElementById('sectionLabel');
+const nextRaceBtn = document.getElementById('nextRaceBtn');
+
+let cW, cH;
+function resize() {
+  cW = canvas.width = canvas.offsetWidth;
+  cH = canvas.height = canvas.offsetHeight;
+}
+
+// ── GRAPH LAYOUT (constant padding) ──
+const PAD = { l: 28, r: 28, t: 28, b: 28 };
+function graphW() { return cW - PAD.l - PAD.r; }
+function graphH() { return cH - PAD.t - PAD.b; }
+function toX(i, steps, gw) { return PAD.l + (i / steps) * gw; }
+function toY(v, gh) { return PAD.t + (1 - v) * gh; }
+
+// ── PATH GENERATION ──
+const totalSteps = 260;
+
+function generateBrownian(seedStr) {
+  const rng = mulberry32(hashSeed(seedStr));
+  const pA = [], pB = [];
+  let ya = 0.5, yb = 0.5;
+  const vol = 0.018;
+  for (let i = 0; i <= totalSteps; i++) {
+    ya = Math.max(0.05, Math.min(0.95, ya + normalRandom(rng) * vol));
+    yb = Math.max(0.05, Math.min(0.95, yb + normalRandom(rng) * vol));
+    pA.push(ya); pB.push(yb);
+  }
+  return [pA, pB];
+}
+
+function generateJumpDiffusion(seedStr, startA, startB) {
+  const rng = mulberry32(hashSeed(seedStr + '_jd'));
+  const pA = [], pB = [];
+  let ya = startA, yb = startB;
+  const vol = 0.014;
+  const jumpRate = 0.10;    // ~10% chance of jump per step (more frequent)
+  const jumpVol = 0.09;     // bigger jumps for visible chaos
+
+  for (let i = 0; i <= totalSteps; i++) {
+    // Brownian component
+    ya += normalRandom(rng) * vol;
+    yb += normalRandom(rng) * vol;
+    // Compound Poisson jumps — can get multiple per step rarely
+    if (rng() < jumpRate) ya += normalRandom(rng) * jumpVol;
+    if (rng() < jumpRate * 0.3) ya += normalRandom(rng) * jumpVol * 1.5; // rare big jump
+    if (rng() < jumpRate) yb += normalRandom(rng) * jumpVol;
+    if (rng() < jumpRate * 0.3) yb += normalRandom(rng) * jumpVol * 1.5;
+    ya = Math.max(0.03, Math.min(0.97, ya));
+    yb = Math.max(0.03, Math.min(0.97, yb));
+    pA.push(ya); pB.push(yb);
+  }
+  return [pA, pB];
+}
+
+// ── CONFETTI ──
+let confetti = [];
+function spawnConfetti(x, y, color) {
+  for (let i = 0; i < 38; i++) {
+    confetti.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -(Math.random() * 4 + 1.5),
+      size: Math.random() * 5 + 3,
+      color, alpha: 1,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.25,
+      gravity: 0.12
+    });
+  }
+}
+
+function drawConfetti() {
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i];
+    c.x += c.vx; c.y += c.vy; c.vy += c.gravity;
+    c.rot += c.rotV; c.alpha -= 0.013;
+    if (c.alpha <= 0) { confetti.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = c.alpha;
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.rot);
+    ctx.fillStyle = c.color;
+    ctx.fillRect(-c.size/2, -c.size/2, c.size, c.size*0.55);
+    ctx.restore();
+  }
+}
+
+// ── DRAW A GRAPH ──
+function drawGraph(offsetX, pathA, pathB, drawnUpTo, label, showExpLine) {
+  const gw = graphW(), gh = graphH();
+  if (gw <= 0 || gh <= 0) return;
+
+  ctx.save();
+  ctx.translate(offsetX, 0);
+
+  // axes
+  ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.l, PAD.t);
+  ctx.lineTo(PAD.l, PAD.t + gh);
+  ctx.lineTo(PAD.l + gw, PAD.t + gh);
+  ctx.stroke();
+
+  // gridlines
+  ctx.strokeStyle = '#f3f3f3';
+  for (let i = 1; i < 4; i++) {
+    const gy = PAD.t + (gh / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.l, gy); ctx.lineTo(PAD.l + gw, gy); ctx.stroke();
+  }
+
+  // expiration line
+  if (showExpLine) {
+    const xEnd = PAD.l + gw;
+    ctx.save();
+    ctx.strokeStyle = '#ddd'; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xEnd, PAD.t); ctx.lineTo(xEnd, PAD.t + gh); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    ctx.fillStyle = '#bbb'; ctx.font = 'italic 11px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('T (expiration)', xEnd, PAD.t - 10);
+  }
+
+  // label at top-left
+  if (label) {
+    ctx.fillStyle = '#bbb'; ctx.font = '10px Helvetica Neue, sans-serif';
+    ctx.textAlign = 'left'; ctx.letterSpacing = '0.2em';
+    ctx.fillText(label, PAD.l + 6, PAD.t + 16);
+  }
+
+  // trails
+  const n = Math.min(Math.floor(drawnUpTo), (pathA ? pathA.length - 1 : 0));
+  if (pathA && pathB && n > 0) {
+    ctx.beginPath();
+    ctx.moveTo(toX(0, totalSteps, gw), toY(pathA[0], gh));
+    for (let i = 1; i <= n; i++) ctx.lineTo(toX(i, totalSteps, gw), toY(pathA[i], gh));
+    ctx.strokeStyle = 'rgba(99,102,241,0.55)'; ctx.lineWidth = 1.8; ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(toX(0, totalSteps, gw), toY(pathB[0], gh));
+    for (let i = 1; i <= n; i++) ctx.lineTo(toX(i, totalSteps, gw), toY(pathB[i], gh));
+    ctx.strokeStyle = 'rgba(244,63,94,0.55)'; ctx.lineWidth = 1.8; ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════
+//  STATE MACHINE
+// ══════════════════════════════════════════════
+const State = {
+  IDLE: 'idle',
+  RACE1: 'race1',
+  RACE1_DONE: 'race1_done',
+  TRANSITION: 'transition',
+  RACE2: 'race2',
+  RACE2_DONE: 'race2_done'
+};
+
+let state = State.IDLE;
+let raf;
+
+// Race state
+let pathA = [], pathB = [];
+let pathA2 = [], pathB2 = [];
+let pStep = 0;
+let finished = false;
+let seedStr = '42';
+
+// Transition state
+const TRANS = {
+  // pre-simulated ball frames: [{ax, ay, bx, by}, ...]
+  frames: [],
+  frameIdx: 0,
+  groundY: 0,
+  // camera
+  camX: 0,
+  camTarget: 0,
+  // new graph world-x origin (calculated from where balls stop)
+  newGraphWorldX: 0,
+  // phases: 'bounce' | 'jump' | 'done'
+  phase: 'bounce',
+  // jump phase
+  jumpT: 0,
+  jumpDuration: 36,
+  jumpStartA: { x:0, y:0 },
+  jumpStartB: { x:0, y:0 },
+  jumpEndA: { x:0, y:0 },
+  jumpEndB: { x:0, y:0 },
+  camJumpStart: 0,
+  camJumpEnd: 0,
+};
+
+// ── RACE 1 ──
+function startRace1(seed) {
+  cancelAnimationFrame(raf);
+  seedStr = seed;
+  confetti = [];
+  finished = false;
+  pStep = 0;
+  state = State.RACE1;
+  wBadge.classList.remove('show');
+  nextRaceBtn.disabled = true;
+  sectionLabel.textContent = 'Race 1 — Pure Brownian Motion';
+  resize();
+  [pathA, pathB] = generateBrownian(seedStr);
+  loopRace1();
+}
+
+function loopRace1() {
+  ctx.clearRect(0, 0, cW, cH);
+  const drawn = Math.min(Math.floor(pStep), totalSteps);
+
+  drawGraph(0, pathA, pathB, drawn, '', true);
+
+  // particles
+  const gw = graphW(), gh = graphH();
+  const ax = toX(drawn, totalSteps, gw), ay = toY(pathA[drawn], gh);
+  const bx = toX(drawn, totalSteps, gw), by = toY(pathB[drawn], gh);
+  drawParticle(ctx, ax, ay, COLOR_A);
+  drawParticle(ctx, bx, by, COLOR_B);
+
+  drawConfetti();
+
+  if (pStep < totalSteps) {
+    pStep += 0.9;
+    raf = requestAnimationFrame(loopRace1);
+  } else {
+    pStep = totalSteps;
+    if (!finished) {
+      finished = true;
+      showWinner(pathA[totalSteps], pathB[totalSteps]);
+      state = State.RACE1_DONE;
+      nextRaceBtn.disabled = false;
+      // keep rendering for confetti
+      function confettiLoop() {
+        ctx.clearRect(0, 0, cW, cH);
+        drawGraph(0, pathA, pathB, totalSteps, '', true);
+        const gw2 = graphW(), gh2 = graphH();
+        drawParticle(ctx, toX(totalSteps, totalSteps, gw2), toY(pathA[totalSteps], gh2), COLOR_A);
+        drawParticle(ctx, toX(totalSteps, totalSteps, gw2), toY(pathB[totalSteps], gh2), COLOR_B);
+        drawConfetti();
+        if (confetti.length > 0) requestAnimationFrame(confettiLoop);
+      }
+      requestAnimationFrame(confettiLoop);
+    }
+  }
+}
+
+function showWinner(finalA, finalB) {
+  if (finalA === finalB) return;
+  const winner = finalA > finalB ? 1 : 2;
+  const wColor = winner === 1 ? COLOR_A : COLOR_B;
+  const gw = graphW(), gh = graphH();
+  const wX = toX(totalSteps, totalSteps, gw);
+  const wY = winner === 1 ? toY(finalA, gh) : toY(finalB, gh);
+
+  wBadge.textContent = `Party ${winner} wins!`;
+  wBadge.style.color = wColor;
+  wBadge.style.border = `1px solid ${wColor}`;
+  wBadge.style.background = '#fff';
+  wBadge.style.left = (wX - 50) + 'px';
+  wBadge.style.top = (wY - 46) + 'px';
+  wBadge.classList.add('show');
+
+  for (let b = 0; b < 5; b++) {
+    setTimeout(() => {
+      spawnConfetti(wX, wY, wColor);
+      spawnConfetti(wX, wY, winner === 1 ? '#a5b4fc' : '#fda4af');
+    }, b * 120);
+  }
+}
+
+// ── PRE-SIMULATE ball physics to find where they stop ──
+function preSimBounce(startAx, startAy, startBx, startBy, groundY) {
+  const gravity = 0.38;
+  const restitution = 0.62;
+  const friction = 0.984;
+  const bounceDamp = 0.5; // extra y-damping when near rest
+
+  let ballA = { x: startAx, y: startAy, vx: 4.0, vy: -5.0 };
+  let ballB = { x: startBx, y: startBy, vx: 4.0, vy: -3.5 };
+  const frames = [];
+  const maxFrames = 600;
+
+  for (let f = 0; f < maxFrames; f++) {
+    for (const ball of [ballA, ballB]) {
+      ball.vy += gravity;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+      ball.vx *= friction;
+
+      // bounce off ground
+      if (ball.y >= groundY - 5) {
+        ball.y = groundY - 5;
+        if (Math.abs(ball.vy) < 2) {
+          ball.vy = 0; // stop micro-bounces
+        } else {
+          ball.vy = -Math.abs(ball.vy) * restitution;
+        }
+      }
+    }
+
+    frames.push({
+      ax: ballA.x, ay: ballA.y,
+      bx: ballB.x, by: ballB.y
+    });
+
+    // Check if both stopped
+    const bothStopped =
+      Math.abs(ballA.vx) < 0.08 && Math.abs(ballB.vx) < 0.08 &&
+      Math.abs(ballA.vy) < 0.5 && Math.abs(ballB.vy) < 0.5 &&
+      ballA.y >= groundY - 6 && ballB.y >= groundY - 6;
+
+    if (bothStopped) break;
+  }
+
+  return frames;
+}
+
+// ── TRANSITION ──
+function startTransition() {
+  cancelAnimationFrame(raf);
+  confetti = [];
+  wBadge.classList.remove('show');
+  nextRaceBtn.disabled = true;
+  state = State.TRANSITION;
+  sectionLabel.style.opacity = '0';
+
+  resize();
+  const gw = graphW(), gh = graphH();
+
+  // starting positions of balls (end of race 1) — in WORLD coords
+  const ax = toX(totalSteps, totalSteps, gw);
+  const ay = toY(pathA[totalSteps], gh);
+  const bx = toX(totalSteps, totalSteps, gw);
+  const by = toY(pathB[totalSteps], gh);
+
+  TRANS.groundY = PAD.t + gh;
+
+  // Pre-simulate the bounce physics
+  TRANS.frames = preSimBounce(ax, ay, bx, by, TRANS.groundY);
+  TRANS.frameIdx = 0;
+
+  // Find where balls end up (last frame)
+  const lastF = TRANS.frames[TRANS.frames.length - 1];
+  const landingX = Math.max(lastF.ax, lastF.bx) + 40; // a bit past the rightmost ball
+
+  // Place new graph so its left axis (PAD.l) starts right at the landing point
+  TRANS.newGraphWorldX = landingX - PAD.l;
+
+  // Camera starts at 0 (no jump!)
+  TRANS.camX = 0;
+  TRANS.camTarget = 0;
+  TRANS.phase = 'bounce';
+
+  // Generate jump-diffusion paths for race 2
+  [pathA2, pathB2] = generateJumpDiffusion(seedStr, 0.5, 0.5);
+
+  loopTransition();
+}
+
+function loopTransition() {
+  const gw = graphW(), gh = graphH();
+
+  if (TRANS.phase === 'bounce') {
+    // Advance pre-simulated frame
+    if (TRANS.frameIdx < TRANS.frames.length - 1) {
+      TRANS.frameIdx++;
+    } else {
+      // Bounce done — setup jump
+      TRANS.phase = 'jump';
+      TRANS.jumpT = 0;
+
+      const lastF = TRANS.frames[TRANS.frames.length - 1];
+      // Ball screen positions = world positions - camX
+      TRANS.jumpStartA = { x: lastF.ax, y: lastF.ay };
+      TRANS.jumpStartB = { x: lastF.bx, y: lastF.by };
+
+      // Jump targets: first data point on the new graph (in world coords)
+      const startXWorld = TRANS.newGraphWorldX + toX(0, totalSteps, gw);
+      TRANS.jumpEndA = { x: startXWorld, y: toY(pathA2[0], gh) };
+      TRANS.jumpEndB = { x: startXWorld, y: toY(pathB2[0], gh) };
+
+      // Camera: at end of jump, new graph should be at x=0 on screen
+      TRANS.camJumpStart = TRANS.camX;
+      TRANS.camJumpEnd = TRANS.newGraphWorldX;
+    }
+
+    // Smooth camera: target keeps the midpoint of balls ~40% from left of screen
+    // This way the graph doesn't jump — it eases out naturally
+    const f = TRANS.frames[TRANS.frameIdx];
+    const midX = (f.ax + f.bx) / 2;
+    // Only start panning once balls move past the right 60% of screen
+    TRANS.camTarget = Math.max(0, midX - cW * 0.55);
+    // Smooth lerp toward target (this is what prevents the jump/glitch)
+    TRANS.camX += (TRANS.camTarget - TRANS.camX) * 0.045;
+  }
+
+  if (TRANS.phase === 'jump') {
+    TRANS.jumpT++;
+    const t = Math.min(TRANS.jumpT / TRANS.jumpDuration, 1);
+    // Smooth ease in-out
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    // Camera eases to final position during jump
+    TRANS.camX = TRANS.camJumpStart + (TRANS.camJumpEnd - TRANS.camJumpStart) * ease;
+
+    if (t >= 1) {
+      TRANS.phase = 'done';
+      // Small pause then start race
+      setTimeout(() => startRace2(), 200);
+    }
+  }
+
+  // ── DRAW ──
+  ctx.clearRect(0, 0, cW, cH);
+
+  // Old graph (world origin 0, shifted by -camX)
+  drawGraph(-TRANS.camX, pathA, pathB, totalSteps, '', true);
+
+  // New graph (world origin newGraphWorldX, shifted by -camX)
+  drawGraph(TRANS.newGraphWorldX - TRANS.camX, null, null, 0, '', true);
+
+  // Balls
+  if (TRANS.phase === 'bounce') {
+    const f = TRANS.frames[TRANS.frameIdx];
+    drawParticle(ctx, f.ax - TRANS.camX, f.ay, COLOR_A);
+    drawParticle(ctx, f.bx - TRANS.camX, f.by, COLOR_B);
+  } else if (TRANS.phase === 'jump' || TRANS.phase === 'done') {
+    const t = Math.min(TRANS.jumpT / TRANS.jumpDuration, 1);
+    const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    // Arc jump in world coords, then convert to screen
+    const arcHeight = -90;
+    const arc = 4 * arcHeight * ease * (1 - ease);
+
+    const awx = TRANS.jumpStartA.x + (TRANS.jumpEndA.x - TRANS.jumpStartA.x) * ease;
+    const awy = (TRANS.jumpStartA.y + (TRANS.jumpEndA.y - TRANS.jumpStartA.y) * ease) + arc;
+    const bwx = TRANS.jumpStartB.x + (TRANS.jumpEndB.x - TRANS.jumpStartB.x) * ease;
+    const bwy = (TRANS.jumpStartB.y + (TRANS.jumpEndB.y - TRANS.jumpStartB.y) * ease) + arc;
+
+    drawParticle(ctx, awx - TRANS.camX, awy, COLOR_A);
+    drawParticle(ctx, bwx - TRANS.camX, bwy, COLOR_B);
+  }
+
+  // Subtle ground line during bounce
+  if (TRANS.phase === 'bounce') {
+    ctx.strokeStyle = 'rgba(0,0,0,0.035)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, TRANS.groundY);
+    ctx.lineTo(cW, TRANS.groundY);
+    ctx.stroke();
+  }
+
+  if (TRANS.phase !== 'done') {
+    raf = requestAnimationFrame(loopTransition);
+  }
+}
+
+// ── RACE 2 (Jump-Diffusion) ──
+function startRace2() {
+  cancelAnimationFrame(raf);
+  confetti = [];
+  finished = false;
+  pStep = 0;
+  state = State.RACE2;
+  sectionLabel.textContent = 'Race 2 — Brownian Motion + Poisson Jumps';
+  sectionLabel.style.opacity = '1';
+  nextRaceBtn.disabled = true;
+  wBadge.classList.remove('show');
+  resize();
+  loopRace2();
+}
+
+function loopRace2() {
+  ctx.clearRect(0, 0, cW, cH);
+  const drawn = Math.min(Math.floor(pStep), totalSteps);
+
+  drawGraph(0, pathA2, pathB2, drawn, '', true);
+
+  const gw = graphW(), gh = graphH();
+  const ax = toX(drawn, totalSteps, gw), ay = toY(pathA2[drawn], gh);
+  const bx = toX(drawn, totalSteps, gw), by = toY(pathB2[drawn], gh);
+  drawParticle(ctx, ax, ay, COLOR_A);
+  drawParticle(ctx, bx, by, COLOR_B);
+
+  drawConfetti();
+
+  if (pStep < totalSteps) {
+    pStep += 0.9;
+    raf = requestAnimationFrame(loopRace2);
+  } else {
+    pStep = totalSteps;
+    if (!finished) {
+      finished = true;
+      showWinner(pathA2[totalSteps], pathB2[totalSteps]);
+      state = State.RACE2_DONE;
+      // confetti loop
+      function confettiLoop2() {
+        ctx.clearRect(0, 0, cW, cH);
+        drawGraph(0, pathA2, pathB2, totalSteps, '', true);
+        const gw2 = graphW(), gh2 = graphH();
+        drawParticle(ctx, toX(totalSteps, totalSteps, gw2), toY(pathA2[totalSteps], gh2), COLOR_A);
+        drawParticle(ctx, toX(totalSteps, totalSteps, gw2), toY(pathB2[totalSteps], gh2), COLOR_B);
+        drawConfetti();
+        if (confetti.length > 0) requestAnimationFrame(confettiLoop2);
+      }
+      requestAnimationFrame(confettiLoop2);
+    }
+  }
+}
+
+// ── CONTROLS ──
+document.getElementById('replayBtn').addEventListener('click', () => {
+  if (state === State.RACE2_DONE || state === State.RACE2) {
+    startRace2();
+  } else {
+    startRace1(document.getElementById('seedInput').value.trim() || '42');
+  }
+});
+
+document.getElementById('newSeedBtn').addEventListener('click', () => {
+  const newSeed = String(Math.floor(Math.random() * 100000));
+  document.getElementById('seedInput').value = newSeed;
+  // Reset to race 1 with new seed
+  startRace1(newSeed);
+});
+
+nextRaceBtn.addEventListener('click', () => {
+  if (state === State.RACE1_DONE) {
+    startTransition();
+  }
+});
+
+// ── SCROLL TRIGGER ──
+const raceSection = document.getElementById('race-section');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      raceSection.classList.add('visible');
+      setTimeout(() => startRace1('42'), 400);
+      obs.disconnect();
+    }
+  });
+}, { threshold: 0.2 });
+obs.observe(raceSection);
+
+// ── RESIZE ──
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resize, 120);
+});
+</script>
+</body>
+</html>
